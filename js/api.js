@@ -1,5 +1,5 @@
 // const API_URL = 'http://localhost:5225';
-const API_URL = 'https://qtqcinema.onrender.com';
+const API_URL = 'https://qtqcinemaapi.onrender.com';
 
 // ==================== HÀM GỌI API CHUNG ====================
 async function apiCall(endpoint, method = 'GET', body = null, token = null) {
