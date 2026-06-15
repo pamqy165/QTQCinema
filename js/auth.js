@@ -38,11 +38,11 @@ function requireLogin() {
     return true;
 }
 
-// Dùng cho trang Admin — nếu chưa login thì redirect về admin/login.html
+// Dùng cho trang Admin — nếu chưa login thì redirect về login.html
 function requireAdminLogin() {
     const token = adminGetToken();
     if (!token) {
-        window.location.href = '/admin/login.html';
+        window.location.href = '../login.html';
         return false;
     }
     return true;
@@ -56,5 +56,5 @@ function logout() {
 
 function adminLogout() {
     adminClearToken();
-    window.location.href = '/admin/login.html';
+    window.location.href = '../login.html';
 }

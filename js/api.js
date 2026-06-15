@@ -1,5 +1,4 @@
-// const API_URL = 'http://localhost:5225';
-const API_URL = 'https://qtqcinemaapi.onrender.com';
+const API_URL = 'http://localhost:5225';
 
 // ==================== HÀM GỌI API CHUNG ====================
 async function apiCall(endpoint, method = 'GET', body = null, token = null) {
@@ -29,8 +28,16 @@ function adminLogin(username, password) {
     return apiCall('/api/auth/admin/login', 'POST', { username, password });
 }
 
+function unifiedLogin(username, password) {
+    return apiCall('/api/auth/unified-login', 'POST', { username, password });
+}
+
 function getProfile() {
     return apiCall('/api/auth/me', 'GET', null, getToken());
+}
+
+function updateProfile(data) {
+    return apiCall('/api/auth/me', 'PUT', data, getToken());
 }
 
 // ==================== MOVIES ====================
