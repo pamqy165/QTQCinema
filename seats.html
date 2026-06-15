@@ -15,6 +15,7 @@
     </div>
     <div class="nav-links">
         <a href="history.html" id="btn-history" style="display:none">Lịch sử đặt vé</a>
+        <a href="profile.html" id="btn-profile" style="display:none">Thông tin cá nhân</a>
         <span id="user-name" style="color:#e50914; font-weight:bold;"></span>
         <a href="login.html" id="btn-login">Đăng nhập</a>
         <button class="btn-logout" id="btn-logout" style="display:none" onclick="logout()">Đăng xuất</button>
@@ -87,6 +88,7 @@
         document.getElementById('btn-login').style.display = 'none';
         document.getElementById('btn-logout').style.display = 'inline-block';
         document.getElementById('btn-history').style.display = 'inline-block';
+        document.getElementById('btn-profile').style.display = 'inline-block';
         const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
         if (userInfo.fullName) {
             document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;

@@ -120,32 +120,30 @@
     if (getToken()) {
         window.location.href = 'index.html';
     }
+    if (adminGetToken()) {
+        window.location.href = 'admin/dashboard.html';
+    }
 
     // ==================== LẤY RETURN URL ====================
-    // Nếu bị redirect từ trang khác sang đây, sau khi login xong quay lại trang đó
     function getReturnUrl() {
         const params = new URLSearchParams(window.location.search);
-        return params.get('returnUrl') || 'index.html';
+        return params.get('returnUrl') || null;
     }
 
     // ==================== CHUYỂN TAB ====================
     function switchTab(tab) {
-        // Ẩn tất cả tab content
         document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.auth-tabs button').forEach(el => el.classList.remove('active'));
-
-        // Hiện tab được chọn
         document.getElementById('content-' + tab).classList.add('active');
         document.getElementById('tab-' + tab).classList.add('active');
     }
 
-    // ==================== XỬ LÝ ĐĂNG NHẬP ====================
+    // ==================== XỬ LÝ ĐĂNG NHẬP (UNIFIED) ====================
     async function handleLogin() {
         const username = document.getElementById('login-username').value.trim();
         const password = document.getElementById('login-password').value;
         const errorEl = document.getElementById('login-error');
 
-        // Kiểm tra nhập đủ thông tin chưa
         if (!username || !password) {
             errorEl.textContent = 'Vui lòng nhập đầy đủ thông tin!';
             errorEl.style.display = 'block';
@@ -154,18 +152,29 @@
 
         try {
             errorEl.style.display = 'none';
-            const data = await login(username, password);
+            const data = await unifiedLogin(username, password);
 
-            // Lưu token và thông tin user
-            setToken(data.token);
-            localStorage.setItem('userInfo', JSON.stringify({
-                username: data.username,
-                fullName: data.fullName,
-                role: data.role
-            }));
+            if (data.role === 'Admin') {
+                // Lưu adminToken và redirect vào dashboard admin
+                adminSetToken(data.token);
+                localStorage.setItem('adminInfo', JSON.stringify({
+                    username: data.username,
+                    role: data.role
+                }));
+                window.location.href = 'admin/dashboard.html';
 
-            // Redirect về trang trước đó
-            window.location.href = getReturnUrl();
+            } else {
+                // Lưu userToken và redirect về trang user
+                setToken(data.token);
+                localStorage.setItem('userInfo', JSON.stringify({
+                    username: data.username,
+                    fullName: data.fullName,
+                    phone: data.phone,
+                    role: data.role
+                }));
+                const returnUrl = getReturnUrl();
+                window.location.href = returnUrl || 'index.html';
+            }
 
         } catch (err) {
             errorEl.textContent = err.message;
@@ -181,7 +190,6 @@
         const password = document.getElementById('reg-password').value;
         const errorEl = document.getElementById('register-error');
 
-        // Kiểm tra nhập đủ thông tin chưa
         if (!username || !fullName || !phone || !password) {
             errorEl.textContent = 'Vui lòng nhập đầy đủ thông tin!';
             errorEl.style.display = 'block';
@@ -192,16 +200,16 @@
             errorEl.style.display = 'none';
             const data = await register(username, fullName, phone, password);
 
-            // Lưu token và thông tin user (auto-login sau đăng ký)
             setToken(data.token);
             localStorage.setItem('userInfo', JSON.stringify({
                 username: data.username,
                 fullName: data.fullName,
+                phone: data.phone,
                 role: data.role
             }));
 
-            // Redirect về trang trước đó
-            window.location.href = getReturnUrl();
+            const returnUrl = getReturnUrl();
+            window.location.href = returnUrl || 'index.html';
 
         } catch (err) {
             errorEl.textContent = err.message;
@@ -209,7 +217,7 @@
         }
     }
 
-    // ==================== NHẤN ENTER ĐỂ ĐĂNG NHẬP ====================
+    // ==================== NHẤN ENTER ĐỂ SUBMIT ====================
     document.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
             const activeTab = document.querySelector('.tab-content.active').id;

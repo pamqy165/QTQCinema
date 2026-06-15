@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thông tin cá nhân - QTQ Cinema</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .profile-container {
+            max-width: 520px;
+            margin: 40px auto;
+        }
+
+        .profile-card {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 20px;
+        }
+
+        .profile-card h2 {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #2a2a2a;
+            color: #e50914;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #2a2a2a;
+            font-size: 15px;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-row .label {
+            color: #aaa;
+            flex-shrink: 0;
+        }
+
+        .info-row .value {
+            font-weight: bold;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">
+        🎬 QTQ CINEMA
+    </div>
+        <div class="nav-links">
+        <a href="index.html">Trang chủ</a>
+        <a href="history.html">Lịch sử đặt vé</a>
+        <span id="user-name" ...></span>
+        <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="profile-container">
+
+        <div class="page-title">👤 Thông tin cá nhân</div>
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">Đang tải thông tin...</div>
+
+        <!-- THÔNG TIN HIỆN TẠI -->
+        <div id="profile-content" style="display:none">
+
+            <div class="profile-card">
+                <h2>📋 Thông tin tài khoản</h2>
+                <div class="info-row">
+                    <span class="label">Tên tài khoản</span>
+                    <span class="value" id="info-username"></span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Họ và tên</span>
+                    <span class="value" id="info-fullname"></span>
+                </div>
+                <div class="info-row">
+                    <span class="label">Số điện thoại</span>
+                    <span class="value" id="info-phone"></span>
+                </div>
+            </div>
+
+            <!-- FORM CẬP NHẬT -->
+            <div class="profile-card">
+                <h2>✏️ Cập nhật thông tin</h2>
+
+                <div id="update-success" class="alert alert-success" style="display:none"></div>
+                <div id="update-error" class="alert alert-error" style="display:none"></div>
+
+                <div class="form-group">
+                    <label>Họ và tên mới</label>
+                    <input type="text" id="f-fullname" placeholder="Để trống nếu không đổi">
+                </div>
+                <div class="form-group">
+                    <label>Số điện thoại mới</label>
+                    <input type="text" id="f-phone" placeholder="Để trống nếu không đổi">
+                </div>
+
+                <button class="btn btn-primary" style="width:100%" onclick="updateInfo()">
+                    💾 Lưu thay đổi
+                </button>
+            </div>
+
+            <!-- FORM ĐỔI MẬT KHẨU -->
+            <div class="profile-card">
+                <h2>🔐 Đổi mật khẩu</h2>
+
+                <div id="pw-success" class="alert alert-success" style="display:none"></div>
+                <div id="pw-error" class="alert alert-error" style="display:none"></div>
+
+                <div class="form-group">
+                    <label>Mật khẩu hiện tại</label>
+                    <input type="password" id="f-current-pw" placeholder="Nhập mật khẩu hiện tại">
+                </div>
+                <div class="form-group">
+                    <label>Mật khẩu mới</label>
+                    <input type="password" id="f-new-pw" placeholder="Tối thiểu 6 ký tự">
+                </div>
+                <div class="form-group">
+                    <label>Xác nhận mật khẩu mới</label>
+                    <input type="password" id="f-confirm-pw" placeholder="Nhập lại mật khẩu mới">
+                </div>
+
+                <button class="btn btn-secondary" style="width:100%" onclick="updatePassword()">
+                    🔑 Đổi mật khẩu
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ====================
+    if (!requireLogin()) {}
+
+    // Hiện tên user trên navbar
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    if (userInfo.fullName) {
+        document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;
+    }
+
+    // ==================== TẢI THÔNG TIN PROFILE ====================
+    async function loadProfile() {
+        try {
+            const profile = await getProfile();
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('profile-content').style.display = 'block';
+
+            document.getElementById('info-username').textContent = profile.username;
+            document.getElementById('info-fullname').textContent = profile.fullName;
+            document.getElementById('info-phone').textContent = profile.phone;
+
+            // Điền sẵn vào form để tiện sửa
+            document.getElementById('f-fullname').value = profile.fullName;
+            document.getElementById('f-phone').value = profile.phone;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải thông tin: ' + err.message;
+        }
+    }
+
+    // ==================== CẬP NHẬT HỌ TÊN / SĐT ====================
+    async function updateInfo() {
+        const fullName = document.getElementById('f-fullname').value.trim();
+        const phone = document.getElementById('f-phone').value.trim();
+        const successEl = document.getElementById('update-success');
+        const errorEl = document.getElementById('update-error');
+
+        successEl.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        if (!fullName && !phone) {
+            errorEl.textContent = 'Vui lòng nhập ít nhất một thông tin cần thay đổi!';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            await updateProfile({ fullName, phone });
+
+            // Cập nhật lại localStorage
+            const info = JSON.parse(localStorage.getItem('userInfo') || '{}');
+            if (fullName) info.fullName = fullName;
+            if (phone) info.phone = phone;
+            localStorage.setItem('userInfo', JSON.stringify(info));
+
+            successEl.textContent = '✅ Cập nhật thông tin thành công!';
+            successEl.style.display = 'block';
+
+            // Reload lại thông tin hiển thị
+            loadProfile();
+
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    // ==================== ĐỔI MẬT KHẨU ====================
+    async function updatePassword() {
+        const currentPassword = document.getElementById('f-current-pw').value;
+        const newPassword = document.getElementById('f-new-pw').value;
+        const confirmPassword = document.getElementById('f-confirm-pw').value;
+        const successEl = document.getElementById('pw-success');
+        const errorEl = document.getElementById('pw-error');
+
+        successEl.style.display = 'none';
+        errorEl.style.display = 'none';
+
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            errorEl.textContent = 'Vui lòng nhập đầy đủ thông tin!';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        if (newPassword !== confirmPassword) {
+            errorEl.textContent = 'Mật khẩu mới và xác nhận không khớp!';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        if (newPassword.length < 6) {
+            errorEl.textContent = 'Mật khẩu mới phải có ít nhất 6 ký tự!';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            await updateProfile({
+                currentPassword,
+                newPassword
+            });
+
+            successEl.textContent = '✅ Đổi mật khẩu thành công!';
+            successEl.style.display = 'block';
+
+            // Xóa form
+            document.getElementById('f-current-pw').value = '';
+            document.getElementById('f-new-pw').value = '';
+            document.getElementById('f-confirm-pw').value = '';
+
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    // Tải thông tin khi trang load
+    loadProfile();
+</script>
+
+</body>
+</html>
