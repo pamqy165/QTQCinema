@@ -32,7 +32,7 @@ function requireLogin() {
     const token = getToken();
     if (!token) {
         const returnUrl = window.location.pathname;
-        window.location.href = '/login.html?returnUrl=' + encodeURIComponent(returnUrl);
+        window.location.href = 'login.html?returnUrl=' + encodeURIComponent(returnUrl);
         return false;
     }
     return true;
@@ -51,7 +51,7 @@ function requireAdminLogin() {
 // ==================== ĐĂNG XUẤT ====================
 function logout() {
     clearToken();
-    window.location.href = '/index.html';
+    window.location.href = 'index.html';
 }
 
 function adminLogout() {
