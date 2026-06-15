@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chọn suất chiếu - QTQ Cinema</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">
+        🎬 QTQ CINEMA
+    </div>
+    <div class="nav-links">
+        <a href="history.html" id="btn-history" style="display:none">Lịch sử đặt vé</a>
+        <span id="user-name" style="color:#e50914; font-weight:bold;"></span>
+        <a href="login.html" id="btn-login">Đăng nhập</a>
+        <button class="btn-logout" id="btn-logout" style="display:none" onclick="logout()">Đăng xuất</button>
+    </div>
+</nav>
+
+<div class="container">
+
+    <!-- THÔNG TIN PHIM -->
+    <div id="movie-info" style="display:none; margin-bottom:32px">
+        <a href="index.html" style="color:#aaa; font-size:14px;">← Quay lại</a>
+        <div style="display:flex; gap:24px; margin-top:16px; align-items:flex-start">
+            <img id="movie-poster" src="" alt="" 
+                style="width:140px; height:200px; object-fit:cover; border-radius:8px"
+                onerror="this.src='https://via.placeholder.com/140x200?text=No+Image'">
+            <div>
+                <h1 id="movie-title" style="font-size:28px; margin-bottom:10px"></h1>
+                <p id="movie-meta" style="color:#aaa; font-size:15px; margin-bottom:8px"></p>
+                <p id="movie-rating" style="color:#f5c518; font-size:16px; font-weight:bold"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- DANH SÁCH SUẤT CHIẾU -->
+    <h2 style="margin-bottom:16px">Chọn suất chiếu</h2>
+
+    <div id="loading" class="loading">Đang tải suất chiếu...</div>
+
+    <div class="showtime-list" id="showtime-list" style="display:none"></div>
+
+    <div class="empty-state" id="empty-state" style="display:none">
+        <p>Hiện chưa có suất chiếu nào cho phim này</p>
+    </div>
+
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+    // ==================== KIỂM TRA ĐĂNG NHẬP ====================
+    const token = getToken();
+    if (token) {
+        document.getElementById('btn-login').style.display = 'none';
+        document.getElementById('btn-logout').style.display = 'inline-block';
+        document.getElementById('btn-history').style.display = 'inline-block';
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        if (userInfo.fullName) {
+            document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;
+        }
+    }
+
+    // ==================== LẤY MOVIE ID TỪ URL ====================
+    // URL dạng: showtime.html?movieId=1
+    const params = new URLSearchParams(window.location.search);
+    const movieId = params.get('movieId');
+
+    // Nếu không có movieId thì quay về trang chủ
+    if (!movieId) {
+        window.location.href = 'index.html';
+    }
+
+    // ==================== TẢI THÔNG TIN PHIM ====================
+    async function loadMovie() {
+        try {
+            const movie = await getMovie(movieId);
+
+            document.getElementById('movie-poster').src = movie.poster || '';
+            document.getElementById('movie-title').textContent = movie.title;
+            document.getElementById('movie-meta').textContent =
+                '⏱ ' + movie.duration + ' phút  |  🌐 ' + movie.language;
+            document.getElementById('movie-rating').textContent = '⭐ ' + movie.rating + ' / 10';
+            document.getElementById('movie-info').style.display = 'block';
+
+        } catch (err) {
+            console.log('Không tải được thông tin phim');
+        }
+    }
+
+    // ==================== TẢI DANH SÁCH SUẤT CHIẾU ====================
+    async function loadShowtimes() {
+        try {
+            const showtimes = await getShowtimes(movieId);
+
+            document.getElementById('loading').style.display = 'none';
+
+            if (showtimes.length === 0) {
+                document.getElementById('empty-state').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('showtime-list').style.display = 'flex';
+
+            // Tạo HTML cho từng suất chiếu
+            const html = showtimes.map(st => `
+                <div class="showtime-card" onclick="selectShowtime(${st.id}, ${st.price})">
+                    <div class="showtime-info">
+                        <h3>🕐 ${st.startTime}</h3>
+                        <p>📅 ${formatDate(st.date)}</p>
+                        <p>🎭 ${st.roomName}</p>
+                    </div>
+                    <div style="text-align:right">
+                        <div class="showtime-price">${formatMoney(st.price)}</div>
+                        <div style="color:#aaa; font-size:13px; margin-top:4px">/ ghế</div>
+                        <button class="btn btn-primary" style="margin-top:10px">Chọn ghế →</button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('showtime-list').innerHTML = html;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải suất chiếu.';
+        }
+    }
+
+    // ==================== CHỌN SUẤT CHIẾU ====================
+    function selectShowtime(showtimeId, price) {
+        // Lưu thông tin vào sessionStorage để dùng ở trang seats
+        sessionStorage.setItem('showtimeId', showtimeId);
+        sessionStorage.setItem('price', price);
+        sessionStorage.setItem('movieId', movieId);
+        window.location.href = 'seats.html?showtimeId=' + showtimeId;
+    }
+
+    // ==================== HELPER: FORMAT NGÀY VÀ TIỀN ====================
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('vi-VN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Gọi 2 hàm khi trang load
+    loadMovie();
+    loadShowtimes();
+</script>
+
+</body>
+</html>

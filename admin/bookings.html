@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý đặt vé - QTQ Cinema Admin</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-logo">🎬 QTQ Admin</div>
+        <a href="dashboard.html">📊 Dashboard</a>
+        <a href="movies.html">🎬 Quản lý phim</a>
+        <a href="showtimes.html">🕐 Suất chiếu</a>
+        <a href="bookings.html" class="active">🎟 Đặt vé</a>
+        <a href="#" onclick="adminLogout()" style="color:#e50914">
+            🚪 Đăng xuất
+        </a>
+    </div>
+
+    <!-- NỘI DUNG CHÍNH -->
+    <div class="admin-content">
+
+        <!-- TIÊU ĐỀ -->
+        <div class="page-title">🎟 Quản lý đặt vé</div>
+
+        <!-- BỘ LỌC -->
+        <div style="
+            display:flex;
+            gap:16px;
+            margin-bottom:20px;
+            background:#1a1a1a;
+            padding:16px;
+            border-radius:10px;
+            align-items:flex-end;
+            flex-wrap:wrap;
+        ">
+            <!-- LỌC THEO PHIM -->
+            <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px">
+                <label>Lọc theo phim</label>
+                <select id="filter-movie">
+                    <option value="">-- Tất cả phim --</option>
+                </select>
+            </div>
+
+            <!-- LỌC THEO NGÀY -->
+            <div class="form-group" style="margin-bottom:0; flex:1; min-width:180px">
+                <label>Lọc theo ngày</label>
+                <input type="date" id="filter-date">
+            </div>
+
+            <!-- NÚT LỌC VÀ RESET -->
+            <div style="display:flex; gap:8px">
+                <button class="btn btn-primary" onclick="loadBookings()">🔍 Lọc</button>
+                <button class="btn btn-secondary" onclick="resetFilter()">↺ Reset</button>
+            </div>
+        </div>
+
+        <!-- THỐNG KÊ NHANH -->
+        <div id="quick-stats" style="
+            display:none;
+            background:#1a1a1a;
+            padding:14px 20px;
+            border-radius:8px;
+            margin-bottom:16px;
+            font-size:14px;
+            color:#aaa;
+            display:flex;
+            gap:24px;
+        ">
+            <span>Tổng booking: <strong id="stat-total" style="color:white">0</strong></span>
+            <span>Đã thanh toán: <strong id="stat-paid" style="color:#28a745">0</strong></span>
+            <span>Chờ thanh toán: <strong id="stat-pending" style="color:#ffc107">0</strong></span>
+            <span>Hết hạn: <strong id="stat-expired" style="color:#ff4444">0</strong></span>
+            <span>Tổng thu: <strong id="stat-revenue" style="color:#e50914">0</strong></span>
+        </div>
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">Đang tải danh sách booking...</div>
+
+        <!-- BẢNG BOOKING -->
+        <div class="table-container" id="table-container" style="display:none">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Mã booking</th>
+                        <th>Khách hàng</th>
+                        <th>Phim</th>
+                        <th>Ngày & Giờ</th>
+                        <th>Ghế</th>
+                        <th>Tổng tiền</th>
+                        <th>Trạng thái</th>
+                        <th>Thời gian đặt</th>
+                    </tr>
+                </thead>
+                <tbody id="bookings-table"></tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<script src="../js/auth.js"></script>
+<script src="../js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ADMIN ====================
+    if (!requireAdminLogin()) {}
+
+    // ==================== TẢI DANH SÁCH PHIM VÀO DROPDOWN ====================
+    async function loadMoviesDropdown() {
+        try {
+            const movies = await adminGetMovies();
+            const html = movies.map(m =>
+                `<option value="${m.id}">${m.title}</option>`
+            ).join('');
+            document.getElementById('filter-movie').innerHTML =
+                '<option value="">-- Tất cả phim --</option>' + html;
+        } catch (err) {
+            console.log('Không tải được danh sách phim');
+        }
+    }
+
+    // ==================== TẢI DANH SÁCH BOOKING ====================
+    async function loadBookings() {
+        const movieId = document.getElementById('filter-movie').value || null;
+        const date = document.getElementById('filter-date').value || null;
+
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('table-container').style.display = 'none';
+        document.getElementById('quick-stats').style.display = 'none';
+
+        try {
+            const bookings = await adminGetBookings(movieId, date);
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('table-container').style.display = 'block';
+
+            // Tính thống kê nhanh
+            const paid = bookings.filter(b => b.paymentStatus === 1);
+            const pending = bookings.filter(b => b.paymentStatus === 0);
+            const expired = bookings.filter(b => b.paymentStatus === 2);
+            const revenue = paid.reduce((sum, b) => sum + b.totalAmount, 0);
+
+            document.getElementById('stat-total').textContent = bookings.length;
+            document.getElementById('stat-paid').textContent = paid.length;
+            document.getElementById('stat-pending').textContent = pending.length;
+            document.getElementById('stat-expired').textContent = expired.length;
+            document.getElementById('stat-revenue').textContent = formatMoney(revenue);
+            document.getElementById('quick-stats').style.display = 'flex';
+
+            if (bookings.length === 0) {
+                document.getElementById('bookings-table').innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align:center; color:#555; padding:24px">
+                            Không có booking nào
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const html = bookings.map(b => `
+                <tr>
+                    <td>
+                        <span style="color:#e50914; font-weight:bold; font-size:13px">
+                            ${b.bookingCode}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="font-weight:bold">${b.fullName}</div>
+                        <div style="color:#aaa; font-size:13px">📞 ${b.phone}</div>
+                    </td>
+                    <td style="font-weight:bold; max-width:160px">${b.movieTitle}</td>
+                    <td>
+                        <div>${formatDate(b.date)}</div>
+                        <div style="color:#aaa; font-size:13px">🕐 ${b.startTime}</div>
+                        <div style="color:#aaa; font-size:13px">🎭 ${b.roomName}</div>
+                    </td>
+                    <td>
+                        <span style="color:#e50914; font-weight:bold">
+                            ${b.seats.join(', ')}
+                        </span>
+                        <div style="color:#aaa; font-size:13px">${b.seats.length} ghế</div>
+                    </td>
+                    <td style="font-weight:bold; color:#e50914">
+                        ${formatMoney(b.totalAmount)}
+                    </td>
+                    <td>
+                        ${b.paymentStatus === 1
+                            ? '<span class="badge badge-paid">✅ Đã thanh toán</span>'
+                            : b.paymentStatus === 2
+                                ? '<span class="badge badge-expired">❌ Hết hạn</span>'
+                                : '<span class="badge badge-pending">⏳ Chờ thanh toán</span>'
+                        }
+                    </td>
+                    <td style="color:#aaa; font-size:13px">
+                        ${formatDateTime(b.createdAt)}
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('bookings-table').innerHTML = html;
+
+        } catch (err) {
+            document.getElementById('loading').textContent =
+                'Không thể tải danh sách booking: ' + err.message;
+            document.getElementById('loading').style.display = 'block';
+        }
+    }
+
+    // ==================== RESET BỘ LỌC ====================
+    function resetFilter() {
+        document.getElementById('filter-movie').value = '';
+        document.getElementById('filter-date').value = '';
+        loadBookings();
+    }
+
+    // ==================== HELPER ====================
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('vi-VN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    }
+
+    function formatDateTime(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleString('vi-VN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+    }
+
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Tải dropdown phim và toàn bộ booking khi trang load
+    loadMoviesDropdown();
+    loadBookings();
+</script>
+
+</body>
+</html>

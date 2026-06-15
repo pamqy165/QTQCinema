@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý phim - QTQ Cinema Admin</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-logo">🎬 QTQ Admin</div>
+        <a href="dashboard.html">📊 Dashboard</a>
+        <a href="movies.html" class="active">🎬 Quản lý phim</a>
+        <a href="showtimes.html">🕐 Suất chiếu</a>
+        <a href="bookings.html">🎟 Đặt vé</a>
+        <a href="#" onclick="adminLogout()" style="color:#e50914">
+            🚪 Đăng xuất
+        </a>
+    </div>
+
+    <!-- NỘI DUNG CHÍNH -->
+    <div class="admin-content">
+
+        <!-- TIÊU ĐỀ + NÚT THÊM -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px">
+            <div class="page-title" style="margin-bottom:0; border-bottom:none">🎬 Quản lý phim</div>
+            <button class="btn btn-primary" onclick="openAddModal()">+ Thêm phim mới</button>
+        </div>
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">Đang tải danh sách phim...</div>
+
+        <!-- BẢNG PHIM -->
+        <div class="table-container" id="table-container" style="display:none">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Poster</th>
+                        <th>Tên phim</th>
+                        <th>Thời lượng</th>
+                        <th>Ngôn ngữ</th>
+                        <th>Rating</th>
+                        <th>Trạng thái</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="movies-table"></tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL THÊM / SỬA PHIM -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal">
+        <h2 id="modal-title" style="margin-bottom:20px">Thêm phim mới</h2>
+
+        <div id="form-error" class="alert alert-error" style="display:none"></div>
+
+        <div class="form-group">
+            <label>Tên phim</label>
+            <input type="text" id="f-title" placeholder="Nhập tên phim">
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+            <div class="form-group">
+                <label>Thời lượng (phút)</label>
+                <input type="number" id="f-duration" placeholder="VD: 120">
+            </div>
+            <div class="form-group">
+                <label>Rating (0-10)</label>
+                <input type="number" id="f-rating" placeholder="VD: 8.5" step="0.1" min="0" max="10">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Ngôn ngữ</label>
+            <input type="text" id="f-language" placeholder="VD: Tiếng Việt, Phụ đề Việt">
+        </div>
+        <div class="form-group">
+            <label>Link poster (URL ảnh)</label>
+            <input type="text" id="f-poster" placeholder="https://...">
+        </div>
+        <div class="form-group">
+            <label>Trạng thái</label>
+            <select id="f-active">
+                <option value="true">Đang chiếu</option>
+                <option value="false">Ẩn</option>
+            </select>
+        </div>
+
+        <div style="display:flex; gap:12px; margin-top:8px">
+            <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Hủy</button>
+            <button class="btn btn-primary" style="flex:1" onclick="saveMovie()" id="btn-save">Lưu</button>
+        </div>
+    </div>
+</div>
+
+<script src="../js/auth.js"></script>
+<script src="../js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ADMIN ====================
+    if (!requireAdminLogin()) {}
+
+    // Biến lưu trạng thái: đang thêm mới hay sửa
+    let editingMovieId = null;
+
+    // ==================== TẢI DANH SÁCH PHIM ====================
+    async function loadMovies() {
+        try {
+            const movies = await adminGetMovies();
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('table-container').style.display = 'block';
+
+            if (movies.length === 0) {
+                document.getElementById('movies-table').innerHTML = `
+                    <tr>
+                        <td colspan="7" style="text-align:center; color:#555; padding:24px">
+                            Chưa có phim nào
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const html = movies.map(m => `
+                <tr>
+                    <td>
+                        <img 
+                            src="${m.poster || ''}" 
+                            style="width:50px; height:70px; object-fit:cover; border-radius:4px"
+                            onerror="this.style.display='none'"
+                        >
+                    </td>
+                    <td style="font-weight:bold">${m.title}</td>
+                    <td>${m.duration} phút</td>
+                    <td>${m.language}</td>
+                    <td style="color:#f5c518">⭐ ${m.rating}</td>
+                    <td>
+                        ${m.isActive
+                            ? '<span class="badge badge-paid">Đang chiếu</span>'
+                            : '<span class="badge badge-pending">Đã ẩn</span>'
+                        }
+                    </td>
+                    <td>
+                        <button 
+                            class="btn btn-secondary" 
+                            style="padding:6px 12px; font-size:13px; margin-right:6px"
+                            onclick="openEditModal(${m.id}, '${escapeStr(m.title)}', ${m.duration}, '${escapeStr(m.language)}', ${m.rating}, '${escapeStr(m.poster)}', ${m.isActive})"
+                        >✏️ Sửa</button>
+                        <button 
+                            class="btn btn-danger" 
+                            style="padding:6px 12px; font-size:13px"
+                            onclick="hideMovie(${m.id}, '${escapeStr(m.title)}')"
+                        >${m.isActive ? '🙈 Ẩn' : '👁 Hiện'}</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('movies-table').innerHTML = html;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải danh sách phim: ' + err.message;
+        }
+    }
+
+    // ==================== MỞ MODAL THÊM MỚI ====================
+    function openAddModal() {
+        editingMovieId = null;
+        document.getElementById('modal-title').textContent = 'Thêm phim mới';
+        document.getElementById('btn-save').textContent = 'Thêm phim';
+
+        // Xóa trắng form
+        document.getElementById('f-title').value = '';
+        document.getElementById('f-duration').value = '';
+        document.getElementById('f-rating').value = '';
+        document.getElementById('f-language').value = '';
+        document.getElementById('f-poster').value = '';
+        document.getElementById('f-active').value = 'true';
+        document.getElementById('form-error').style.display = 'none';
+
+        document.getElementById('modal-overlay').classList.add('active');
+    }
+
+    // ==================== MỞ MODAL SỬA ====================
+    function openEditModal(id, title, duration, language, rating, poster, isActive) {
+        editingMovieId = id;
+        document.getElementById('modal-title').textContent = 'Sửa thông tin phim';
+        document.getElementById('btn-save').textContent = 'Lưu thay đổi';
+
+        // Điền thông tin hiện tại vào form
+        document.getElementById('f-title').value = title;
+        document.getElementById('f-duration').value = duration;
+        document.getElementById('f-rating').value = rating;
+        document.getElementById('f-language').value = language;
+        document.getElementById('f-poster').value = poster;
+        document.getElementById('f-active').value = isActive ? 'true' : 'false';
+        document.getElementById('form-error').style.display = 'none';
+
+        document.getElementById('modal-overlay').classList.add('active');
+    }
+
+    // ==================== LƯU PHIM (THÊM MỚI HOẶC SỬA) ====================
+    async function saveMovie() {
+        const title = document.getElementById('f-title').value.trim();
+        const duration = parseInt(document.getElementById('f-duration').value);
+        const rating = parseFloat(document.getElementById('f-rating').value);
+        const language = document.getElementById('f-language').value.trim();
+        const poster = document.getElementById('f-poster').value.trim();
+        const isActive = document.getElementById('f-active').value === 'true';
+        const errorEl = document.getElementById('form-error');
+
+        // Kiểm tra nhập đủ thông tin chưa
+        if (!title || !duration || !language) {
+            errorEl.textContent = 'Vui lòng nhập đầy đủ thông tin!';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        const data = { title, duration, language, rating, poster, isActive };
+
+        try {
+            errorEl.style.display = 'none';
+
+            if (editingMovieId) {
+                // Đang sửa
+                await updateMovie(editingMovieId, data);
+            } else {
+                // Đang thêm mới
+                await createMovie(data);
+            }
+
+            closeModal();
+            loadMovies(); // Tải lại danh sách
+
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    // ==================== ẨN / HIỆN PHIM ====================
+    async function hideMovie(id, title) {
+        if (!confirm('Bạn có chắc muốn thay đổi trạng thái phim "' + title + '"?')) return;
+
+        try {
+            await deleteMovie(id);
+            loadMovies(); // Tải lại danh sách
+        } catch (err) {
+            alert('Lỗi: ' + err.message);
+        }
+    }
+
+    // ==================== ĐÓNG MODAL ====================
+    function closeModal(event) {
+        if (!event || event.target === document.getElementById('modal-overlay')) {
+            document.getElementById('modal-overlay').classList.remove('active');
+        }
+    }
+
+    // ==================== HELPER ====================
+    // Tránh lỗi khi tên phim có dấu ' hoặc "
+    function escapeStr(str) {
+        return (str || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+
+    // Tải danh sách phim khi trang load
+    loadMovies();
+</script>
+
+</body>
+</html>

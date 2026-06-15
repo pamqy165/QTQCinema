@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - QTQ Cinema Admin</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-logo">🎬 QTQ Admin</div>
+        <a href="dashboard.html" class="active">📊 Dashboard</a>
+        <a href="movies.html">🎬 Quản lý phim</a>
+        <a href="showtimes.html">🕐 Suất chiếu</a>
+        <a href="bookings.html">🎟 Đặt vé</a>
+        <a href="#" onclick="adminLogout()" style="margin-top:auto; color:#e50914">
+            🚪 Đăng xuất
+        </a>
+    </div>
+
+    <!-- NỘI DUNG CHÍNH -->
+    <div class="admin-content">
+
+        <!-- TIÊU ĐỀ -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px">
+            <div class="page-title" style="margin-bottom:0; border-bottom:none">
+                📊 Tổng quan hệ thống
+            </div>
+            <div style="color:#aaa; font-size:14px" id="admin-name"></div>
+        </div>
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">Đang tải dữ liệu...</div>
+
+        <!-- NỘI DUNG DASHBOARD -->
+        <div id="dashboard-content" style="display:none">
+
+            <!-- 4 THỐNG KÊ -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-revenue">0</div>
+                    <div class="stat-label">💰 Tổng doanh thu</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-tickets">0</div>
+                    <div class="stat-label">🎟 Tổng vé đã bán</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-bookings">0</div>
+                    <div class="stat-label">📋 Tổng số booking</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-hot-tickets">0</div>
+                    <div class="stat-label">🔥 Vé phim hot nhất</div>
+                </div>
+            </div>
+
+            <!-- PHIM HOT NHẤT -->
+            <div style="
+                background:#1a1a1a;
+                border-radius:10px;
+                padding:20px;
+                margin-bottom:24px;
+                border-left: 4px solid #f5c518;
+            ">
+                <div style="color:#aaa; font-size:13px; margin-bottom:6px">🔥 Phim hot nhất</div>
+                <div id="stat-hot-movie" style="font-size:22px; font-weight:bold; color:#f5c518"></div>
+            </div>
+
+            <!-- SUẤT CHIẾU SẮP TỚI -->
+            <div class="page-title" style="font-size:20px">🕐 Suất chiếu sắp tới</div>
+
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Phim</th>
+                            <th>Phòng</th>
+                            <th>Ngày chiếu</th>
+                            <th>Giờ chiếu</th>
+                            <th>Giá vé</th>
+                        </tr>
+                    </thead>
+                    <tbody id="upcoming-showtimes"></tbody>
+                </table>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script src="../js/auth.js"></script>
+<script src="../js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ADMIN ====================
+    if (!requireAdminLogin()) {
+        // requireAdminLogin() tự redirect nếu chưa login
+    }
+
+    // Hiện tên admin
+    const adminInfo = JSON.parse(localStorage.getItem('adminInfo') || '{}');
+    if (adminInfo.username) {
+        document.getElementById('admin-name').textContent = '👤 ' + adminInfo.username;
+    }
+
+    // ==================== TẢI DỮ LIỆU DASHBOARD ====================
+    async function loadDashboard() {
+        try {
+            const data = await adminGetDashboard();
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dashboard-content').style.display = 'block';
+
+            // Điền số liệu thống kê
+            document.getElementById('stat-revenue').textContent = formatMoney(data.totalRevenue);
+            document.getElementById('stat-tickets').textContent = data.totalTickets;
+            document.getElementById('stat-bookings').textContent = data.totalBookings;
+            document.getElementById('stat-hot-movie').textContent = data.hotMovie;
+            document.getElementById('stat-hot-tickets').textContent = data.hotMovieTickets;
+
+            // Điền bảng suất chiếu sắp tới
+            if (data.upcomingShowtimes.length === 0) {
+                document.getElementById('upcoming-showtimes').innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align:center; color:#555; padding:24px">
+                            Chưa có suất chiếu nào
+                        </td>
+                    </tr>
+                `;
+            } else {
+                const html = data.upcomingShowtimes.map(st => `
+                    <tr>
+                        <td style="font-weight:bold">${st.movieTitle}</td>
+                        <td>${st.roomName}</td>
+                        <td>${formatDate(st.date)}</td>
+                        <td>${st.startTime}</td>
+                        <td style="color:#e50914; font-weight:bold">${formatMoney(st.price)}</td>
+                    </tr>
+                `).join('');
+                document.getElementById('upcoming-showtimes').innerHTML = html;
+            }
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải dữ liệu: ' + err.message;
+        }
+    }
+
+    // ==================== HELPER ====================
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('vi-VN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    }
+
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Tải dữ liệu khi trang load
+    loadDashboard();
+</script>
+
+</body>
+</html>

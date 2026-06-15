@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản lý suất chiếu - QTQ Cinema Admin</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<div class="admin-layout">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+        <div class="sidebar-logo">🎬 QTQ Admin</div>
+        <a href="dashboard.html">📊 Dashboard</a>
+        <a href="movies.html">🎬 Quản lý phim</a>
+        <a href="showtimes.html" class="active">🕐 Suất chiếu</a>
+        <a href="bookings.html">🎟 Đặt vé</a>
+        <a href="#" onclick="adminLogout()" style="color:#e50914">
+            🚪 Đăng xuất
+        </a>
+    </div>
+
+    <!-- NỘI DUNG CHÍNH -->
+    <div class="admin-content">
+
+        <!-- TIÊU ĐỀ + NÚT THÊM -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:24px">
+            <div class="page-title" style="margin-bottom:0; border-bottom:none">🕐 Quản lý suất chiếu</div>
+            <button class="btn btn-primary" onclick="openAddModal()">+ Thêm suất chiếu</button>
+        </div>
+
+        <!-- BỘ LỌC THEO PHIM -->
+        <div style="display:flex; gap:12px; margin-bottom:20px; align-items:center">
+            <label style="color:#aaa; font-size:14px">Lọc theo phim:</label>
+            <select id="filter-movie" onchange="loadShowtimes()" style="
+                background:#2a2a2a;
+                border:1px solid #444;
+                color:white;
+                padding:8px 12px;
+                border-radius:6px;
+                font-size:14px;
+                min-width:200px;
+            ">
+                <option value="">-- Chọn phim --</option>
+            </select>
+        </div>
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">Vui lòng chọn phim để xem suất chiếu</div>
+
+        <!-- BẢNG SUẤT CHIẾU -->
+        <div class="table-container" id="table-container" style="display:none">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Phim</th>
+                        <th>Phòng chiếu</th>
+                        <th>Ngày chiếu</th>
+                        <th>Giờ chiếu</th>
+                        <th>Giá vé</th>
+                        <th>Hành động</th>
+                    </tr>
+                </thead>
+                <tbody id="showtimes-table"></tbody>
+            </table>
+        </div>
+
+    </div>
+</div>
+
+<!-- MODAL THÊM SUẤT CHIẾU -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal">
+        <h2 style="margin-bottom:20px">Thêm suất chiếu mới</h2>
+
+        <div id="form-error" class="alert alert-error" style="display:none"></div>
+
+        <div class="form-group">
+            <label>Phim</label>
+            <select id="f-movie">
+                <option value="">-- Chọn phim --</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Phòng chiếu</label>
+            <select id="f-room">
+                <option value="1">Phòng 1</option>
+                <option value="2">Phòng 2</option>
+                <option value="3">Phòng 3</option>
+            </select>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px">
+            <div class="form-group">
+                <label>Ngày chiếu</label>
+                <input type="date" id="f-date">
+            </div>
+            <div class="form-group">
+                <label>Giờ chiếu</label>
+                <input type="time" id="f-time" placeholder="VD: 10:00">
+            </div>
+        </div>
+        <div class="form-group">
+            <label>Giá vé (VND)</label>
+            <input type="number" id="f-price" placeholder="VD: 90000">
+        </div>
+
+        <div style="display:flex; gap:12px; margin-top:8px">
+            <button class="btn btn-secondary" style="flex:1" onclick="closeModal()">Hủy</button>
+            <button class="btn btn-primary" style="flex:1" onclick="saveShowtime()">Thêm suất chiếu</button>
+        </div>
+    </div>
+</div>
+
+<script src="../js/auth.js"></script>
+<script src="../js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ADMIN ====================
+    if (!requireAdminLogin()) {}
+
+    // Lưu danh sách phim để dùng nhiều chỗ
+    let moviesList = [];
+
+    // ==================== TẢI DANH SÁCH PHIM VÀO DROPDOWN ====================
+    async function loadMoviesDropdown() {
+        try {
+            moviesList = await getMovies();
+
+            // Điền vào dropdown lọc
+            const filterHtml = moviesList.map(m =>
+                `<option value="${m.id}">${m.title}</option>`
+            ).join('');
+            document.getElementById('filter-movie').innerHTML =
+                '<option value="">-- Chọn phim --</option>' + filterHtml;
+
+            // Điền vào dropdown trong modal
+            document.getElementById('f-movie').innerHTML =
+                '<option value="">-- Chọn phim --</option>' + filterHtml;
+
+        } catch (err) {
+            console.log('Không tải được danh sách phim');
+        }
+    }
+
+    // ==================== TẢI SUẤT CHIẾU THEO PHIM ====================
+    async function loadShowtimes() {
+        const movieId = document.getElementById('filter-movie').value;
+
+        if (!movieId) {
+            document.getElementById('loading').textContent = 'Vui lòng chọn phim để xem suất chiếu';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('table-container').style.display = 'none';
+            return;
+        }
+
+        document.getElementById('loading').textContent = 'Đang tải suất chiếu...';
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('table-container').style.display = 'none';
+
+        try {
+            const showtimes = await getShowtimes(movieId);
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('table-container').style.display = 'block';
+
+            if (showtimes.length === 0) {
+                document.getElementById('showtimes-table').innerHTML = `
+                    <tr>
+                        <td colspan="6" style="text-align:center; color:#555; padding:24px">
+                            Chưa có suất chiếu nào cho phim này
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            const html = showtimes.map(st => `
+                <tr>
+                    <td style="font-weight:bold">${st.movieTitle}</td>
+                    <td>${st.roomName}</td>
+                    <td>${formatDate(st.date)}</td>
+                    <td>${st.startTime}</td>
+                    <td style="color:#e50914; font-weight:bold">${formatMoney(st.price)}</td>
+                    <td>
+                        <button 
+                            class="btn btn-danger" 
+                            style="padding:6px 12px; font-size:13px"
+                            onclick="removeShowtime(${st.id})"
+                        >🗑 Xóa</button>
+                    </td>
+                </tr>
+            `).join('');
+
+            document.getElementById('showtimes-table').innerHTML = html;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải suất chiếu: ' + err.message;
+            document.getElementById('loading').style.display = 'block';
+        }
+    }
+
+    // ==================== MỞ MODAL THÊM SUẤT CHIẾU ====================
+    function openAddModal() {
+        // Set ngày mặc định là hôm nay
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('f-date').value = today;
+        document.getElementById('f-time').value = '10:00';
+        document.getElementById('f-price').value = '';
+        document.getElementById('f-movie').value = '';
+        document.getElementById('f-room').value = '1';
+        document.getElementById('form-error').style.display = 'none';
+
+        document.getElementById('modal-overlay').classList.add('active');
+    }
+
+    // ==================== LƯU SUẤT CHIẾU MỚI ====================
+    async function saveShowtime() {
+        const movieId = parseInt(document.getElementById('f-movie').value);
+        const roomId = parseInt(document.getElementById('f-room').value);
+        const date = document.getElementById('f-date').value;
+        const startTime = document.getElementById('f-time').value;
+        const price = parseFloat(document.getElementById('f-price').value);
+        const errorEl = document.getElementById('form-error');
+
+        // Kiểm tra nhập đủ thông tin chưa
+        if (!movieId || !date || !startTime || !price) {
+            errorEl.textContent = 'Vui lòng nhập đầy đủ thông tin!';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        try {
+            errorEl.style.display = 'none';
+
+            await createShowtime({
+                movieId,
+                roomId,
+                date: new Date(date).toISOString(),
+                startTime,
+                price
+            });
+
+            closeModal();
+
+            // Tự động lọc theo phim vừa thêm
+            document.getElementById('filter-movie').value = movieId;
+            loadShowtimes();
+
+        } catch (err) {
+            errorEl.textContent = err.message;
+            errorEl.style.display = 'block';
+        }
+    }
+
+    // ==================== XÓA SUẤT CHIẾU ====================
+    async function removeShowtime(id) {
+        if (!confirm('Bạn có chắc muốn xóa suất chiếu này?')) return;
+
+        try {
+            await deleteShowtime(id);
+            loadShowtimes(); // Tải lại danh sách
+        } catch (err) {
+            alert('Lỗi: ' + err.message);
+        }
+    }
+
+    // ==================== ĐÓNG MODAL ====================
+    function closeModal(event) {
+        if (!event || event.target === document.getElementById('modal-overlay')) {
+            document.getElementById('modal-overlay').classList.remove('active');
+        }
+    }
+
+    // ==================== HELPER ====================
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('vi-VN', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    }
+
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Tải dropdown phim khi trang load
+    loadMoviesDropdown();
+</script>
+
+</body>
+</html>

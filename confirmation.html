@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đặt vé thành công - QTQ Cinema</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .success-icon {
+            text-align: center;
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
+
+        .success-title {
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+            margin-bottom: 8px;
+        }
+
+        .success-subtitle {
+            text-align: center;
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 28px;
+        }
+
+        .ticket-card {
+            background: #252525;
+            border-radius: 10px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #333;
+        }
+
+        .ticket-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #2a2a2a;
+            font-size: 15px;
+        }
+
+        .ticket-row:last-child {
+            border-bottom: none;
+        }
+
+        .ticket-row .label {
+            color: #aaa;
+        }
+
+        .ticket-row .value {
+            font-weight: bold;
+            text-align: right;
+            max-width: 60%;
+        }
+
+        .booking-code-box {
+            background: #1a1a1a;
+            border: 2px dashed #e50914;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .booking-code-box .code-label {
+            color: #aaa;
+            font-size: 13px;
+            margin-bottom: 6px;
+        }
+
+        .booking-code-box .code-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #e50914;
+            letter-spacing: 3px;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .action-buttons .btn {
+            flex: 1;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">
+        🎬 QTQ CINEMA
+    </div>
+    <div class="nav-links">
+        <span id="user-name" style="color:#e50914; font-weight:bold;"></span>
+        <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="payment-container">
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">Đang tải thông tin vé...</div>
+
+        <!-- NỘI DUNG XÁC NHẬN -->
+        <div id="confirmation-content" style="display:none">
+
+            <!-- ICON VÀ TIÊU ĐỀ -->
+            <div class="success-icon">🎉</div>
+            <div class="success-title">Đặt vé thành công!</div>
+            <div class="success-subtitle">Cảm ơn bạn đã sử dụng dịch vụ của QTQ Cinema</div>
+
+            <!-- MÃ BOOKING -->
+            <div class="booking-code-box">
+                <div class="code-label">Mã đặt vé của bạn</div>
+                <div class="code-value" id="booking-code"></div>
+            </div>
+
+            <!-- THÔNG TIN VÉ -->
+            <div class="ticket-card">
+                <div class="ticket-row">
+                    <span class="label">🎬 Phim</span>
+                    <span class="value" id="movie-title"></span>
+                </div>
+                <div class="ticket-row">
+                    <span class="label">🎭 Phòng chiếu</span>
+                    <span class="value" id="room-name"></span>
+                </div>
+                <div class="ticket-row">
+                    <span class="label">📅 Ngày chiếu</span>
+                    <span class="value" id="show-date"></span>
+                </div>
+                <div class="ticket-row">
+                    <span class="label">🕐 Giờ chiếu</span>
+                    <span class="value" id="show-time"></span>
+                </div>
+                <div class="ticket-row">
+                    <span class="label">💺 Ghế</span>
+                    <span class="value" id="seats" style="color:#e50914"></span>
+                </div>
+                <div class="ticket-row">
+                    <span class="label">👤 Họ và tên</span>
+                    <span class="value" id="full-name"></span>
+                </div>
+                <div class="ticket-row">
+                    <span class="label">📞 Số điện thoại</span>
+                    <span class="value" id="phone"></span>
+                </div>
+                <div class="ticket-row" style="margin-top:8px">
+                    <span style="font-size:17px; font-weight:bold">💰 Tổng tiền</span>
+                    <span style="font-size:20px; font-weight:bold; color:#e50914" id="total-amount"></span>
+                </div>
+                <div class="ticket-row">
+                    <span class="label">Trạng thái</span>
+                    <span class="badge badge-paid">✅ Đã thanh toán</span>
+                </div>
+            </div>
+
+            <!-- NÚT HÀNH ĐỘNG -->
+            <div class="action-buttons">
+                <button class="btn btn-secondary" onclick="window.location.href='history.html'">
+                    📋 Lịch sử đặt vé
+                </button>
+                <button class="btn btn-primary" onclick="window.location.href='index.html'">
+                    🎬 Đặt vé khác
+                </button>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ====================
+    if (!requireLogin()) {
+        // requireLogin() tự redirect nếu chưa login
+    }
+
+    // Hiện tên user
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    if (userInfo.fullName) {
+        document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;
+    }
+
+    // ==================== LẤY BOOKING CODE TỪ SESSION ====================
+    const bookingCode = sessionStorage.getItem('paidBookingCode');
+
+    // Nếu không có thì quay về trang chủ
+    if (!bookingCode) {
+        window.location.href = 'index.html';
+    }
+
+    // ==================== TẢI THÔNG TIN VÉ ====================
+    async function loadConfirmation() {
+        try {
+            const booking = await getBooking(bookingCode);
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('confirmation-content').style.display = 'block';
+
+            // Điền thông tin vào trang
+            document.getElementById('booking-code').textContent = booking.bookingCode;
+            document.getElementById('movie-title').textContent = booking.movieTitle;
+            document.getElementById('room-name').textContent = booking.roomName;
+            document.getElementById('show-date').textContent = formatDate(booking.date);
+            document.getElementById('show-time').textContent = booking.startTime;
+            document.getElementById('seats').textContent = booking.seats.join(', ');
+            document.getElementById('full-name').textContent = booking.fullName;
+            document.getElementById('phone').textContent = booking.phone;
+            document.getElementById('total-amount').textContent = formatMoney(booking.totalAmount);
+
+            // Xóa session sau khi đã hiển thị xong
+            sessionStorage.removeItem('bookingId');
+            sessionStorage.removeItem('bookingCode');
+            sessionStorage.removeItem('paidBookingCode');
+            sessionStorage.removeItem('showtimeId');
+            sessionStorage.removeItem('price');
+            sessionStorage.removeItem('movieId');
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải thông tin vé: ' + err.message;
+        }
+    }
+
+    // ==================== HELPER ====================
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('vi-VN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Tải thông tin khi trang load
+    loadConfirmation();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Thanh toán - QTQ Cinema</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">
+        🎬 QTQ CINEMA
+    </div>
+    <div class="nav-links">
+        <span id="user-name" style="color:#e50914; font-weight:bold;"></span>
+        <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="payment-container">
+
+        <h2 style="margin-bottom:24px; text-align:center">🎟 Xác nhận đặt vé</h2>
+
+        <!-- LOADING -->
+        <div id="loading" class="loading">Đang tải thông tin...</div>
+
+        <!-- NỘI DUNG THANH TOÁN -->
+        <div id="payment-content" style="display:none">
+
+            <!-- TÓM TẮT THÔNG TIN VÉ -->
+            <div class="booking-summary">
+                <div class="summary-row">
+                    <span class="label">Phim</span>
+                    <span id="movie-title" style="font-weight:bold; text-align:right; max-width:60%"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Phòng chiếu</span>
+                    <span id="room-name"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Ngày chiếu</span>
+                    <span id="show-date"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Giờ chiếu</span>
+                    <span id="show-time"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Ghế</span>
+                    <span id="seats" style="color:#e50914; font-weight:bold"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Họ và tên</span>
+                    <span id="full-name"></span>
+                </div>
+                <div class="summary-row">
+                    <span class="label">Số điện thoại</span>
+                    <span id="phone"></span>
+                </div>
+                <div class="summary-row total-row">
+                    <span>Tổng tiền</span>
+                    <span id="total-amount"></span>
+                </div>
+            </div>
+
+            <!-- QR CODE GIẢ LẬP -->
+            <div class="qr-container">
+                <p style="color:#aaa; margin-bottom:12px; font-size:14px">
+                    Quét mã QR để thanh toán
+                </p>
+                <img id="qr-image" src="" alt="QR Code">
+                <p style="color:#aaa; margin-top:12px; font-size:13px">
+                    Mã booking: <strong id="booking-code" style="color:white"></strong>
+                </p>
+            </div>
+
+            <!-- NÚT XÁC NHẬN -->
+            <button 
+                class="btn btn-success" 
+                style="width:100%; font-size:16px; padding:14px"
+                onclick="confirmPayment()"
+                id="btn-confirm"
+            >
+                ✅ Xác nhận đã thanh toán
+            </button>
+
+            <p style="color:#aaa; font-size:12px; text-align:center; margin-top:12px">
+                * Trong hệ thống thực tế, hệ thống sẽ tự động xác nhận sau khi quét QR
+            </p>
+
+        </div>
+
+    </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ====================
+    if (!requireLogin()) {
+        // requireLogin() tự redirect nếu chưa login
+    }
+
+    // Hiện tên user
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    if (userInfo.fullName) {
+        document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;
+    }
+
+    // ==================== LẤY BOOKING ID TỪ SESSION ====================
+    const bookingId = sessionStorage.getItem('bookingId');
+    const bookingCode = sessionStorage.getItem('bookingCode');
+
+    // Nếu không có bookingId thì quay về trang chủ
+    if (!bookingId) {
+        window.location.href = 'index.html';
+    }
+
+    // ==================== TẢI THÔNG TIN BOOKING ====================
+    async function loadBookingInfo() {
+        try {
+            // Lấy chi tiết booking theo mã code
+            const booking = await getBooking(bookingCode);
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('payment-content').style.display = 'block';
+
+            // Điền thông tin vào trang
+            document.getElementById('movie-title').textContent = booking.movieTitle;
+            document.getElementById('room-name').textContent = booking.roomName;
+            document.getElementById('show-date').textContent = formatDate(booking.date);
+            document.getElementById('show-time').textContent = booking.startTime;
+            document.getElementById('seats').textContent = booking.seats.join(', ');
+            document.getElementById('full-name').textContent = booking.fullName;
+            document.getElementById('phone').textContent = booking.phone;
+            document.getElementById('total-amount').textContent = formatMoney(booking.totalAmount);
+            document.getElementById('booking-code').textContent = booking.bookingCode;
+
+            // Tạo QR code giả lập bằng API miễn phí
+            const qrData = encodeURIComponent('QTQ Cinema - ' + booking.bookingCode + ' - ' + formatMoney(booking.totalAmount));
+            document.getElementById('qr-image').src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + qrData;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải thông tin booking: ' + err.message;
+        }
+    }
+
+    // ==================== XÁC NHẬN THANH TOÁN ====================
+    async function confirmPayment() {
+        const btn = document.getElementById('btn-confirm');
+        btn.disabled = true;
+        btn.textContent = 'Đang xử lý...';
+
+        try {
+            await payBooking(bookingId);
+
+            // Lưu bookingCode để dùng ở trang confirmation
+            sessionStorage.setItem('paidBookingCode', bookingCode);
+
+            window.location.href = 'confirmation.html';
+
+        } catch (err) {
+            alert('Lỗi: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = '✅ Xác nhận đã thanh toán';
+        }
+    }
+
+    // ==================== HELPER ====================
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('vi-VN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Tải thông tin khi trang load
+    loadBookingInfo();
+</script>
+
+</body>
+</html>

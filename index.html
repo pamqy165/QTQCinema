@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QTQ Cinema</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="logo">🎬 QTQ CINEMA</div>
+    <div class="nav-links">
+        <a href="history.html" id="btn-history" style="display:none">Lịch sử đặt vé</a>
+        <span id="user-name" style="color:#e50914; font-weight:bold;"></span>
+        <a href="login.html" id="btn-login">Đăng nhập</a>
+        <button class="btn-logout" id="btn-logout" style="display:none" onclick="logout()">Đăng xuất</button>
+    </div>
+</nav>
+
+<!-- NỘI DUNG CHÍNH -->
+<div class="container">
+    <h1 style="margin-bottom: 8px;">Phim đang chiếu</h1>
+    <p style="color:#aaa; margin-bottom: 24px;">Chọn phim bạn muốn xem</p>
+
+    <!-- Hiển thị loading khi đang tải -->
+    <div id="loading" class="loading">Đang tải danh sách phim...</div>
+
+    <!-- Danh sách phim sẽ được render vào đây -->
+    <div class="movies-grid" id="movies-grid" style="display:none"></div>
+
+    <!-- Hiện khi không có phim nào -->
+    <div class="empty-state" id="empty-state" style="display:none">
+        <p>Hiện chưa có phim nào đang chiếu</p>
+    </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+    // ==================== KIỂM TRA ĐĂNG NHẬP ====================
+    // Khi vào trang chủ, kiểm tra xem đã login chưa
+    const token = getToken();
+    if (token) {
+        // Đã login: ẩn nút Đăng nhập, hiện nút Đăng xuất + Lịch sử
+        document.getElementById('btn-login').style.display = 'none';
+        document.getElementById('btn-logout').style.display = 'inline-block';
+        document.getElementById('btn-history').style.display = 'inline-block';
+
+        // Lấy tên user từ localStorage nếu có
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        if (userInfo.fullName) {
+            document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;
+        }
+    }
+
+    // ==================== TẢI DANH SÁCH PHIM ====================
+    async function loadMovies() {
+        try {
+            const movies = await getMovies();
+
+            document.getElementById('loading').style.display = 'none';
+
+            if (movies.length === 0) {
+                document.getElementById('empty-state').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('movies-grid').style.display = 'grid';
+
+            // Tạo HTML cho từng phim
+            const html = movies.map(movie => `
+                <div class="movie-card" onclick="window.location.href='showtime.html?movieId=${movie.id}'">
+                    <img 
+                        src="${movie.poster || 'https://via.placeholder.com/200x280?text=No+Image'}" 
+                        alt="${movie.title}"
+                        onerror="this.src='https://via.placeholder.com/200x280?text=No+Image'"
+                    >
+                    <div class="movie-info">
+                        <div class="movie-title">${movie.title}</div>
+                        <div class="movie-meta">
+                            <span>⏱ ${movie.duration} phút</span> &nbsp;|&nbsp;
+                            <span>🌐 ${movie.language}</span>
+                        </div>
+                        <div class="movie-meta" style="margin-top:4px">
+                            <span class="movie-rating">⭐ ${movie.rating}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('movies-grid').innerHTML = html;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải danh sách phim. Hãy kiểm tra backend đã chạy chưa.';
+        }
+    }
+
+    // Gọi hàm tải phim khi trang load xong
+    loadMovies();
+</script>
+
+</body>
+</html>

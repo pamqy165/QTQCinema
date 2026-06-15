@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lịch sử đặt vé - QTQ Cinema</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .booking-card {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 16px;
+            border: 1px solid #2a2a2a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .booking-card:hover {
+            border-color: #e50914;
+        }
+
+        .booking-card .booking-left {
+            flex: 1;
+        }
+
+        .booking-card .booking-movie {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 6px;
+        }
+
+        .booking-card .booking-detail {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .booking-card .booking-seats {
+            color: #e50914;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .booking-card .booking-right {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .booking-card .booking-amount {
+            font-size: 20px;
+            font-weight: bold;
+            color: #e50914;
+            margin-bottom: 8px;
+        }
+
+        .booking-card .booking-code {
+            color: #555;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        /* MODAL CHI TIẾT */
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #2a2a2a;
+            font-size: 15px;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-row .label {
+            color: #aaa;
+        }
+
+        .detail-row .value {
+            font-weight: bold;
+            text-align: right;
+            max-width: 60%;
+        }
+    </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">
+        🎬 QTQ CINEMA
+    </div>
+    <div class="nav-links">
+        <span id="user-name" style="color:#e50914; font-weight:bold;"></span>
+        <a href="index.html">Trang chủ</a>
+        <button class="btn-logout" onclick="logout()">Đăng xuất</button>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="page-title">📋 Lịch sử đặt vé</div>
+
+    <!-- LOADING -->
+    <div id="loading" class="loading">Đang tải lịch sử...</div>
+
+    <!-- DANH SÁCH BOOKING -->
+    <div id="booking-list" style="display:none"></div>
+
+    <!-- TRỐNG -->
+    <div class="empty-state" id="empty-state" style="display:none">
+        <p>Bạn chưa có lịch sử đặt vé nào</p>
+        <br>
+        <button class="btn btn-primary" onclick="window.location.href='index.html'">
+            🎬 Đặt vé ngay
+        </button>
+    </div>
+</div>
+
+<!-- MODAL CHI TIẾT BOOKING -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal">
+        <h2 style="margin-bottom:20px">🎟 Chi tiết vé</h2>
+
+        <div class="detail-row">
+            <span class="label">Mã đặt vé</span>
+            <span class="value" id="modal-code" style="color:#e50914"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">🎬 Phim</span>
+            <span class="value" id="modal-movie"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">🎭 Phòng chiếu</span>
+            <span class="value" id="modal-room"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">📅 Ngày chiếu</span>
+            <span class="value" id="modal-date"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">🕐 Giờ chiếu</span>
+            <span class="value" id="modal-time"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">💺 Ghế</span>
+            <span class="value" id="modal-seats" style="color:#e50914"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">👤 Họ và tên</span>
+            <span class="value" id="modal-name"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">📞 Số điện thoại</span>
+            <span class="value" id="modal-phone"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">💰 Tổng tiền</span>
+            <span class="value" id="modal-amount" style="color:#e50914; font-size:18px"></span>
+        </div>
+        <div class="detail-row">
+            <span class="label">Trạng thái</span>
+            <span class="value" id="modal-status"></span>
+        </div>
+
+        <button 
+            class="btn btn-secondary" 
+            style="width:100%; margin-top:20px"
+            onclick="closeModal()"
+        >
+            Đóng
+        </button>
+    </div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+    // ==================== BẮT BUỘC PHẢI ĐĂNG NHẬP ====================
+    if (!requireLogin()) {
+        // requireLogin() tự redirect nếu chưa login
+    }
+
+    // Hiện tên user
+    const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+    if (userInfo.fullName) {
+        document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;
+    }
+
+    // ==================== TẢI LỊCH SỬ ĐẶT VÉ ====================
+    async function loadHistory() {
+        try {
+            const bookings = await getMyBookings();
+
+            document.getElementById('loading').style.display = 'none';
+
+            if (bookings.length === 0) {
+                document.getElementById('empty-state').style.display = 'block';
+                return;
+            }
+
+            document.getElementById('booking-list').style.display = 'block';
+
+            // Tạo HTML cho từng booking
+            const html = bookings.map(b => `
+                <div class="booking-card" onclick="showDetail('${b.bookingCode}')">
+                    <div class="booking-left">
+                        <div class="booking-movie">${b.movieTitle}</div>
+                        <div class="booking-detail">
+                            📅 ${formatDate(b.date)} &nbsp;|&nbsp; 🕐 ${b.startTime}
+                        </div>
+                        <div class="booking-detail">
+                            🎭 ${b.roomName}
+                        </div>
+                        <div class="booking-seats">
+                            💺 Ghế: ${b.seats.join(', ')}
+                        </div>
+                        <div class="booking-code">Mã: ${b.bookingCode}</div>
+                    </div>
+                    <div class="booking-right">
+                        <div class="booking-amount">${formatMoney(b.totalAmount)}</div>
+                        ${b.paymentStatus === 1
+                            ? '<span class="badge badge-paid">✅ Đã thanh toán</span>'
+                            : b.paymentStatus === 2
+                                ? '<span class="badge badge-expired">❌ Hết hạn</span>'
+                                : '<span class="badge badge-pending">⏳ Chờ thanh toán</span>'
+                        }
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('booking-list').innerHTML = html;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải lịch sử: ' + err.message;
+        }
+    }
+
+    // ==================== HIỆN MODAL CHI TIẾT ====================
+    async function showDetail(code) {
+        try {
+            const b = await getBooking(code);
+
+            document.getElementById('modal-code').textContent = b.bookingCode;
+            document.getElementById('modal-movie').textContent = b.movieTitle;
+            document.getElementById('modal-room').textContent = b.roomName;
+            document.getElementById('modal-date').textContent = formatDate(b.date);
+            document.getElementById('modal-time').textContent = b.startTime;
+            document.getElementById('modal-seats').textContent = b.seats.join(', ');
+            document.getElementById('modal-name').textContent = b.fullName;
+            document.getElementById('modal-phone').textContent = b.phone;
+            document.getElementById('modal-amount').textContent = formatMoney(b.totalAmount);
+            document.getElementById('modal-status').innerHTML = b.paymentStatus === 2 ? '<span class="badge badge-expired">❌ Hết hạn</span>' : b.paymentStatus === 1
+                ? '<span class="badge badge-paid">✅ Đã thanh toán</span>'
+                : '<span class="badge badge-pending">⏳ Chờ thanh toán</span>';
+
+            // Hiện modal
+            document.getElementById('modal-overlay').classList.add('active');
+
+        } catch (err) {
+            alert('Không thể tải chi tiết: ' + err.message);
+        }
+    }
+
+    // ==================== ĐÓNG MODAL ====================
+    function closeModal(event) {
+        // Chỉ đóng khi click vào vùng tối bên ngoài hoặc nút Đóng
+        if (!event || event.target === document.getElementById('modal-overlay')) {
+            document.getElementById('modal-overlay').classList.remove('active');
+        }
+    }
+
+    // ==================== HELPER ====================
+    function formatDate(dateStr) {
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('vi-VN', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Tải lịch sử khi trang load
+    loadHistory();
+</script>
+
+</body>
+</html>

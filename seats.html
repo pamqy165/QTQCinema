@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chọn ghế - QTQ Cinema</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+    <div class="logo" onclick="window.location.href='index.html'" style="cursor:pointer">
+        🎬 QTQ CINEMA
+    </div>
+    <div class="nav-links">
+        <a href="history.html" id="btn-history" style="display:none">Lịch sử đặt vé</a>
+        <span id="user-name" style="color:#e50914; font-weight:bold;"></span>
+        <a href="login.html" id="btn-login">Đăng nhập</a>
+        <button class="btn-logout" id="btn-logout" style="display:none" onclick="logout()">Đăng xuất</button>
+    </div>
+</nav>
+
+<div class="container">
+    <a href="javascript:history.back()" style="color:#aaa; font-size:14px;">← Quay lại</a>
+
+    <h2 style="margin: 16px 0 24px">Chọn ghế ngồi</h2>
+
+    <!-- MÀN HÌNH -->
+    <div class="screen">MÀN HÌNH</div>
+
+    <!-- CHÚ THÍCH MÀU GHẾ -->
+    <div class="seat-legend">
+        <div class="legend-item">
+            <div class="legend-box" style="background:#333"></div>
+            <span>Còn trống</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box" style="background:#e50914"></div>
+            <span>Đang chọn</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-box" style="background:#555"></div>
+            <span>Đã đặt</span>
+        </div>
+    </div>
+
+    <!-- SƠ ĐỒ GHẾ -->
+    <div id="loading" class="loading">Đang tải sơ đồ ghế...</div>
+    <div class="seats-grid" id="seats-grid" style="display:none"></div>
+
+    <!-- THANH THÔNG TIN PHÍA DƯỚI -->
+    <div id="booking-bar" style="
+        display:none;
+        position:fixed;
+        bottom:0; left:0; right:0;
+        background:#1a1a1a;
+        border-top: 2px solid #e50914;
+        padding: 16px 40px;
+        display:none;
+        justify-content:space-between;
+        align-items:center;
+    ">
+        <div>
+            <div style="color:#aaa; font-size:13px">Ghế đã chọn</div>
+            <div id="selected-seats-text" style="font-size:16px; font-weight:bold; color:#e50914"></div>
+        </div>
+        <div style="text-align:center">
+            <div style="color:#aaa; font-size:13px">Tổng tiền</div>
+            <div id="total-price" style="font-size:22px; font-weight:bold; color:#e50914"></div>
+        </div>
+        <button class="btn btn-primary" style="font-size:16px; padding:12px 32px" onclick="proceedToPayment()">
+            Đặt vé →
+        </button>
+    </div>
+
+    <!-- PADDING ĐỂ TRÁNH BỊ THANH DƯỚI CHE -->
+    <div style="height:100px"></div>
+</div>
+
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script>
+    // ==================== KIỂM TRA ĐĂNG NHẬP ====================
+    const token = getToken();
+    if (token) {
+        document.getElementById('btn-login').style.display = 'none';
+        document.getElementById('btn-logout').style.display = 'inline-block';
+        document.getElementById('btn-history').style.display = 'inline-block';
+        const userInfo = JSON.parse(localStorage.getItem('userInfo') || '{}');
+        if (userInfo.fullName) {
+            document.getElementById('user-name').textContent = 'Xin chào, ' + userInfo.fullName;
+        }
+    }
+
+    // ==================== LẤY SHOWTIME ID TỪ URL ====================
+    const params = new URLSearchParams(window.location.search);
+    const showtimeId = params.get('showtimeId');
+
+    if (!showtimeId) {
+        window.location.href = 'index.html';
+    }
+
+    // Lấy giá vé từ sessionStorage (lưu từ trang showtime)
+    const price = parseFloat(sessionStorage.getItem('price') || 0);
+
+    // Danh sách ghế đang được chọn
+    let selectedSeats = []; // [{id, name}]
+
+    // ==================== TẢI SƠ ĐỒ GHẾ ====================
+    async function loadSeats() {
+        try {
+            const seats = await getSeats(showtimeId);
+
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('seats-grid').style.display = 'flex';
+
+            // Nhóm ghế theo hàng (A, B, C...)
+            const rows = {};
+            seats.forEach(seat => {
+                if (!rows[seat.row]) rows[seat.row] = [];
+                rows[seat.row].push(seat);
+            });
+
+            // Tạo HTML sơ đồ ghế
+            let html = '';
+            Object.keys(rows).sort().forEach(row => {
+                html += `<div class="seat-row">`;
+                html += `<div class="row-label">${row}</div>`;
+
+                rows[row].forEach(seat => {
+                    const isBooked = seat.status === 1; // 1 = Booked
+                    const seatName = seat.row + seat.number;
+                    if (isBooked) {
+                        html += `<button class="seat booked" disabled>${seat.number}</button>`;
+                    } else {
+                        html += `<button 
+                            class="seat available" 
+                            id="seat-${seat.id}"
+                            onclick="toggleSeat(${seat.id}, '${seatName}')"
+                        >${seat.number}</button>`;
+                    }
+                });
+
+                html += `</div>`;
+            });
+
+            document.getElementById('seats-grid').innerHTML = html;
+
+        } catch (err) {
+            document.getElementById('loading').textContent = 'Không thể tải sơ đồ ghế.';
+        }
+    }
+
+    // ==================== CHỌN / BỎ CHỌN GHẾ ====================
+    function toggleSeat(seatId, seatName) {
+        const btn = document.getElementById('seat-' + seatId);
+        const index = selectedSeats.findIndex(s => s.id === seatId);
+
+        if (index === -1) {
+            // Chưa chọn → chọn vào
+            selectedSeats.push({ id: seatId, name: seatName });
+            btn.classList.remove('available');
+            btn.classList.add('selected');
+        } else {
+            // Đã chọn → bỏ ra
+            selectedSeats.splice(index, 1);
+            btn.classList.remove('selected');
+            btn.classList.add('available');
+        }
+
+        updateBookingBar();
+    }
+
+    // ==================== CẬP NHẬT THANH DƯỚI ====================
+    function updateBookingBar() {
+        const bar = document.getElementById('booking-bar');
+
+        if (selectedSeats.length === 0) {
+            bar.style.display = 'none';
+            return;
+        }
+
+        bar.style.display = 'flex';
+
+        // Hiện tên ghế đã chọn: A1, A2, B3...
+        const seatNames = selectedSeats.map(s => s.name).join(', ');
+        document.getElementById('selected-seats-text').textContent = seatNames;
+
+        // Tính tổng tiền
+        const total = price * selectedSeats.length;
+        document.getElementById('total-price').textContent = formatMoney(total);
+    }
+
+    // ==================== ĐẶT VÉ ====================
+    async function proceedToPayment() {
+        // Kiểm tra đã đăng nhập chưa
+        if (!getToken()) {
+            window.location.href = 'login.html?returnUrl=' + encodeURIComponent(window.location.pathname + window.location.search);
+            return;
+        }
+
+        if (selectedSeats.length === 0) {
+            alert('Vui lòng chọn ít nhất 1 ghế!');
+            return;
+        }
+
+        try {
+            // Tạo booking
+            const seatIds = selectedSeats.map(s => s.id);
+            const booking = await createBooking(parseInt(showtimeId), seatIds);
+
+            // Lưu bookingId để dùng ở trang payment
+            sessionStorage.setItem('bookingId', booking.id);
+            sessionStorage.setItem('bookingCode', booking.bookingCode);
+
+            window.location.href = 'payment.html';
+
+        } catch (err) {
+            alert('Lỗi: ' + err.message);
+        }
+    }
+
+    // ==================== FORMAT TIỀN ====================
+    function formatMoney(amount) {
+        return new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(amount);
+    }
+
+    // Tải ghế khi trang load
+    loadSeats();
+</script>
+
+</body>
+</html>
